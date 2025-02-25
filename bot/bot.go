@@ -49,6 +49,7 @@ func Run() {
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: "Draft started",
+					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
 		},
