@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -85,15 +84,6 @@ func Run(db *sql.DB) {
 
 	if *RemoveCommands {
 		log.Println("Removing commands...")
-		// // We need to fetch the commands, since deleting requires the command ID.
-		// // We are doing this from the returned commands on line 375, because using
-		// // this will delete all the commands, which might not be desirable, so we
-		// // are deleting only the commands that we added.
-		// registeredCommands, err := s.ApplicationCommands(s.State.User.ID, *GuildID)
-		// if err != nil {
-		// 	log.Fatalf("Could not fetch registered commands: %v", err)
-		// }
-
 		for _, v := range registeredCommands {
 			err := discord.ApplicationCommandDelete(discord.State.User.ID, "885029273180700763", v.ID)
 			if err != nil {
@@ -135,22 +125,6 @@ func handleInteractionWithUserTracking(s *discordgo.Session, i *discordgo.Intera
 }
 
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
-
-	/* prevent bot responding to its own message
-	this is achived by looking into the message author id
-	if message.author.id is same as bot.author.id then just return
-	*/
-	if message.Author.ID == discord.State.User.ID {
-		return
-	}
-
-	// respond to user message if it contains `!help` or `!bye`
-	switch {
-	case strings.Contains(message.Content, "!help"):
-		discord.ChannelMessageSend(message.ChannelID, "Hello World😃")
-	case strings.Contains(message.Content, "!bye"):
-		discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-		// add more cases if required
-	}
+	// TODO: Not sure if this will do anything ever
 
 }
