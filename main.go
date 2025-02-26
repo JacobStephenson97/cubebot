@@ -25,6 +25,5 @@ func main() {
 	}
 
 	bot.BotToken = os.Getenv("DISCORD_TOKEN")
-
-	bot.Run() // call the run function of bot/bot.go
+	bot.Run(db) // Pass the DB connection to Run
 }

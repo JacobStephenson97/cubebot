@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"cubebot/internal/db"
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +14,7 @@ import (
 )
 
 var BotToken string
+var database *sql.DB // Add a package-level variable to store the DB connection
 
 var (
 	RemoveCommands = flag.Bool("rmcmd", true, "Remove all commands after shutdowning or not")
@@ -23,7 +26,8 @@ func checkNilErr(e error) {
 	}
 }
 
-func Run() {
+func Run(db *sql.DB) {
+	database = db // Store the DB connection
 	// create a session
 	discord, err := discordgo.New("Bot " + BotToken)
 	checkNilErr(err)
@@ -56,9 +60,8 @@ func Run() {
 	}
 
 	discord.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if handler, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-			handler(s, i)
-		}
+		// Create wrapper to handle user in database before processing command
+		handleInteractionWithUserTracking(s, i, commandHandlers)
 	})
 
 	// Register commands after opening the session
@@ -99,6 +102,36 @@ func Run() {
 		}
 	}
 
+}
+
+// handleInteractionWithUserTracking ensures the user is saved in the database
+// before handling the command interaction
+func handleInteractionWithUserTracking(s *discordgo.Session, i *discordgo.InteractionCreate,
+	commandHandlers map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate)) {
+	guild, err := s.Guild(i.GuildID)
+	if err != nil {
+		log.Printf("Error getting guild: %v", err)
+	}
+
+	// Get the user from the interaction
+	user := i.User
+	if user == nil && i.Member != nil {
+		user = i.Member.User
+	}
+
+	if user != nil {
+		// Insert or update user in database
+		err := db.UpsertUser(database, user, guild)
+		if err != nil {
+			log.Printf("Error saving user to database: %v", err)
+			// Continue processing even if DB operation fails
+		}
+	}
+
+	// After tracking the user, call the original handler
+	if handler, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+		handler(s, i)
+	}
 }
 
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
