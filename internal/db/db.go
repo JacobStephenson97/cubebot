@@ -133,7 +133,6 @@ func CreateTables(db *sql.DB) error {
 				// Ignore duplicate index errors (MySQL error 1061)
 				// This lets us run the scripts multiple times without error
 				if strings.Contains(err.Error(), "Error 1061") || strings.Contains(err.Error(), "Duplicate key name") {
-					fmt.Printf("Ignoring duplicate key error in %s: %v\n", file.Name(), err)
 				} else {
 					// Print the SQL that failed to help debug other errors
 					fmt.Printf("Error executing SQL from file %s:\n%s\n", file.Name(), sqlContent)

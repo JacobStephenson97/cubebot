@@ -63,15 +63,12 @@ func Run(db *sql.DB) {
 		handleInteractionWithUserTracking(s, i, commandHandlers)
 	})
 
+	//add a event handler for guild join
+	discord.AddHandler(func(s *discordgo.Session, g *discordgo.GuildCreate) {
+		registerCommandsForGuild(s, g.Guild.ID, commands)
+	})
+
 	// Register commands after opening the session
-	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
-	for i, v := range commands {
-		cmd, err := discord.ApplicationCommandCreate(discord.State.User.ID, "885029273180700763", v)
-		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
-		}
-		registeredCommands[i] = cmd
-	}
 
 	// add a event handler
 	discord.AddHandler(newMessage)
@@ -83,12 +80,8 @@ func Run(db *sql.DB) {
 	<-c
 
 	if *RemoveCommands {
-		log.Println("Removing commands...")
-		for _, v := range registeredCommands {
-			err := discord.ApplicationCommandDelete(discord.State.User.ID, "885029273180700763", v.ID)
-			if err != nil {
-				log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
-			}
+		for _, guild := range discord.State.Guilds {
+			removeCommandsForGuild(discord, guild.ID, commands)
 		}
 	}
 
@@ -127,4 +120,37 @@ func handleInteractionWithUserTracking(s *discordgo.Session, i *discordgo.Intera
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	// TODO: Not sure if this will do anything ever
 
+}
+
+func registerCommandsForGuild(s *discordgo.Session, guildID string, commands []*discordgo.ApplicationCommand) {
+	log.Println("Registering commands for guild: ", guildID)
+	for _, v := range commands {
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildID, v)
+		if err != nil {
+			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+		}
+		log.Println("Command registered: ", cmd.Name)
+	}
+}
+
+func removeCommandsForGuild(s *discordgo.Session, guildID string, commands []*discordgo.ApplicationCommand) {
+	log.Println("Removing commands for guild:", guildID)
+
+	// First, get all registered commands for this guild
+	registeredCommands, err := s.ApplicationCommands(s.State.User.ID, guildID)
+	if err != nil {
+		log.Printf("Warning: Failed to fetch commands for guild %s: %v", guildID, err)
+		return
+	}
+
+	// Delete each command by name
+	for _, cmd := range registeredCommands {
+		err := s.ApplicationCommandDelete(s.State.User.ID, guildID, cmd.ID)
+		if err != nil {
+			// Log error but don't panic
+			log.Printf("Warning: Cannot delete '%v' command in guild %s: %v", cmd.Name, guildID, err)
+		} else {
+			log.Printf("Command removed: %s", cmd.Name)
+		}
+	}
 }
