@@ -12,6 +12,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var database *sql.DB
+
 func Connect() (*sql.DB, error) {
 	// Open up our database connection
 	db, err := sql.Open("mysql", os.Getenv("DB_CONN_STRING"))
@@ -26,18 +28,19 @@ func Connect() (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to bootstrap database: %w", err)
 	}
 
+	database = db
 	return db, nil
 }
 
 // UpsertUser inserts a user into the database if they don't exist,
 // or updates their information if they do exist
-func UpsertUser(db *sql.DB, user *discordgo.User, guild *discordgo.Guild) error {
+func UpsertUser(user *discordgo.User, guild *discordgo.Guild) error {
 	currentTime := time.Now()
 
 	// First, make sure the guild exists in the database
 	if guild.ID != "" {
 		var guildExists bool
-		err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM guilds WHERE discord_guild_id = ?)", guild.ID).Scan(&guildExists)
+		err := GetDB().QueryRow("SELECT EXISTS(SELECT 1 FROM guilds WHERE id = ?)", guild.ID).Scan(&guildExists)
 		if err != nil {
 			return fmt.Errorf("error checking if guild exists: %w", err)
 		}
@@ -45,8 +48,8 @@ func UpsertUser(db *sql.DB, user *discordgo.User, guild *discordgo.Guild) error 
 		if !guildExists {
 			// If we don't have guild name available, just use the ID as a placeholder
 			// Typically you would fetch the guild info using the Discord API
-			_, err = db.Exec(
-				"INSERT INTO guilds (discord_guild_id, guild_name) VALUES (?, ?)",
+			_, err = GetDB().Exec(
+				"INSERT INTO guilds (id, guild_name) VALUES (?, ?)",
 				guild.ID,
 				guild.Name, // Placeholder name
 			)
@@ -58,7 +61,7 @@ func UpsertUser(db *sql.DB, user *discordgo.User, guild *discordgo.Guild) error 
 
 	// Then handle the user
 	var userExists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE discord_id = ?)", user.ID).Scan(&userExists)
+	err := GetDB().QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", user.ID).Scan(&userExists)
 	if err != nil {
 		return fmt.Errorf("error checking if user exists: %w", err)
 	}
@@ -71,8 +74,8 @@ func UpsertUser(db *sql.DB, user *discordgo.User, guild *discordgo.Guild) error 
 
 	if userExists {
 		// Update existing user
-		_, err = db.Exec(
-			"UPDATE users SET discord_username = ?, display_name = ?, avatar_url = ?, updated_at = ? WHERE discord_id = ?",
+		_, err = GetDB().Exec(
+			"UPDATE users SET discord_username = ?, display_name = ?, avatar_url = ?, updated_at = ? WHERE id = ?",
 			user.Username,
 			user.GlobalName,
 			avatarURL,
@@ -84,8 +87,8 @@ func UpsertUser(db *sql.DB, user *discordgo.User, guild *discordgo.Guild) error 
 		}
 	} else {
 		// Insert new user
-		_, err = db.Exec(
-			"INSERT INTO users (discord_id, discord_username, display_name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		_, err = GetDB().Exec(
+			"INSERT INTO users (id, discord_username, display_name, avatar_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
 			user.ID,
 			user.Username,
 			user.GlobalName,
@@ -146,4 +149,38 @@ func CreateTables(db *sql.DB) error {
 
 	fmt.Println("Database bootstrap completed successfully")
 	return nil
+}
+
+func GetDB() *sql.DB {
+	return database
+}
+
+func AddParticipantToDraftSession(sessionID int, userID string) error {
+	_, err := GetDB().Exec("INSERT INTO draft_participants (session_id, user_id) VALUES (?, ?)", sessionID, userID)
+	return err
+}
+
+func RemoveParticipantFromDraftSession(sessionID int, userID string) error {
+	_, err := GetDB().Exec("DELETE FROM draft_participants WHERE session_id = ? AND user_id = ?", sessionID, userID)
+	return err
+}
+
+func GetDraftSessionParticipants(sessionID int) ([]string, error) {
+	rows, err := GetDB().Query("SELECT user_id FROM draft_participants WHERE session_id = ?", sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	participants := []string{}
+	for rows.Next() {
+		var userID string
+		err = rows.Scan(&userID)
+		if err != nil {
+			return nil, err
+		}
+		participants = append(participants, userID)
+	}
+
+	return participants, nil
 }

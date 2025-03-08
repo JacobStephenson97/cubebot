@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    discord_id VARCHAR(20) NOT NULL UNIQUE,
+    id VARCHAR(20) NOT NULL UNIQUE PRIMARY KEY,
     discord_username VARCHAR(100) NOT NULL,
     display_name VARCHAR(100),
     avatar_url VARCHAR(255),
@@ -9,4 +8,4 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Index for quickly looking up users by their Discord ID
-CREATE INDEX idx_users_discord_id ON users(discord_id); 
+CREATE INDEX idx_users_id ON users(id); 

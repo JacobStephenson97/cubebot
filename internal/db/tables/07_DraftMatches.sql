@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS draft_matches (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT different_participants CHECK (participant1_id != participant2_id),
-    FOREIGN KEY (round_id) REFERENCES draft_rounds(id),
-    FOREIGN KEY (participant1_id) REFERENCES draft_participants(id),
-    FOREIGN KEY (participant2_id) REFERENCES draft_participants(id),
-    FOREIGN KEY (winner_id) REFERENCES draft_participants(id)
+    FOREIGN KEY (round_id) REFERENCES draft_rounds(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant1_id) REFERENCES draft_participants(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant2_id) REFERENCES draft_participants(id) ON DELETE CASCADE,
+    FOREIGN KEY (winner_id) REFERENCES draft_participants(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_draft_matches_round_id ON draft_matches(round_id);
